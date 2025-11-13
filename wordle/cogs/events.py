@@ -161,12 +161,19 @@ class EventsCog(commands.Cog):
 
         header_fill = PatternFill("solid", fgColor="8A8A8A")
         data_fill = PatternFill("solid", fgColor="BABABA")
+        extra_headers_fill = PatternFill("solid", fgColor="75BB75")
+        align_center = Alignment(horizontal="center", vertical="center")
         no_border = Border(
             left=Side(style="none"),
             right=Side(style="none"),
             top=Side(style="none"),
             bottom=Side(style="none"),
         )
+
+        # Placement medal colors
+        gold_fill = PatternFill("solid", fgColor="FFD700")
+        silver_fill = PatternFill("solid", fgColor="C0C0C0")
+        bronze_fill = PatternFill("solid", fgColor="CD7F32")
 
         usernames: set[str] = set()
         for day_data in user_data.values():
@@ -217,9 +224,9 @@ class EventsCog(commands.Cog):
         )
         total_title_cell = ws.cell(row=totals_header_row, column=1)
         total_title_cell.value = "TOTAL SCORE"
-        total_title_cell.fill = PatternFill("solid", fgColor="75BB75")
+        total_title_cell.fill = extra_headers_fill
         total_title_cell.border = no_border
-        total_title_cell.alignment = Alignment(horizontal="center", vertical="center")
+        total_title_cell.alignment = align_center
 
         # Write sub-headers A: "Players" and B: "Total Points"
         totals_subheaders_row = totals_header_row + 1
@@ -249,6 +256,72 @@ class EventsCog(commands.Cog):
             total_cell.value = totals.get(username, 0)
             total_cell.fill = data_fill
             total_cell.border = no_border
+
+        # Create a leaderboard table with each player's placement.
+        # First sort the totals
+        sorted_totals = sorted(totals.items(), key=lambda k: k[1], reverse=True)
+
+        leaderboard_start_col = 4
+        leaderboard_header_row = totals_header_row
+
+        ws.merge_cells(
+            start_row=leaderboard_header_row,
+            start_column=leaderboard_start_col,
+            end_row=leaderboard_header_row,
+            end_column=leaderboard_start_col + 1,
+        )
+        leaderboard_title_cell = ws.cell(
+            row=leaderboard_header_row,
+            column=leaderboard_start_col,
+        )
+        leaderboard_title_cell.value = "WORDLE LEADERBOARD"
+        leaderboard_title_cell.fill = extra_headers_fill
+        leaderboard_title_cell.border = no_border
+        leaderboard_title_cell.alignment = align_center
+
+        leaderboard_subheader_row = leaderboard_header_row + 1
+
+        lb_players_header = ws.cell(
+            row=leaderboard_subheader_row,
+            column=leaderboard_start_col,
+        )
+        lb_players_header.value = "Players"
+        lb_players_header.fill = header_fill
+        lb_players_header.border = no_border
+
+        lb_placement_header = ws.cell(
+            row=leaderboard_subheader_row,
+            column=leaderboard_start_col + 1,
+        )
+        lb_placement_header.value = "Placement"
+        lb_placement_header.fill = header_fill
+        lb_placement_header.border = no_border
+
+        # Leaderboard data rows
+        leaderboard_data_start_row = leaderboard_subheader_row + 1
+
+        for rank, (username, total) in enumerate(sorted_totals, start=1):
+            row = leaderboard_data_start_row + (rank - 1)
+
+            player_cell = ws.cell(row=row, column=leaderboard_start_col)
+            player_cell.value = username
+            player_cell.border = no_border
+            player_cell.fill = header_fill
+
+            placement_cell = ws.cell(row=row, column=leaderboard_start_col + 1)
+            placement_cell.value = f"#{rank}"
+            placement_cell.border = no_border
+            placement_cell.fill = data_fill
+
+            if rank == 1:
+                player_cell.fill = gold_fill
+                placement_cell.fill = gold_fill
+            elif rank == 2:
+                player_cell.fill = silver_fill
+                placement_cell.fill = silver_fill
+            elif rank == 3:
+                player_cell.fill = bronze_fill
+                placement_cell.fill = bronze_fill
 
         # Auto-fit column widths for usernames
         for column_cells in ws.columns:
