@@ -1,0 +1,27 @@
+[project]
+name = "wordle"
+version = "0.1.0"
+description = "Discord bot to generate report for monthly wordle stats"
+authors = [{ name = "atbuy", email = "buy@atbuy.dev" }]
+license = { text = "MIT" }
+readme = "README.md"
+requires-python = ">=3.12,<4"
+dependencies = [
+  "discord.py==2.6.4",
+  "loguru==0.7.3",
+  "pydantic==2.12.4",
+  "pydantic-settings==2.12.0",
+]
+
+[project.optional-dependencies]
+dev = ["pre-commit==4.2.0", "ruff==0.11.7"]
+
+[project.urls]
+"Homepage" = "https://github.com/atbuy/wordle-stats-bot"
+"Bug Tracker" = "https://github.com/atbuy/wordle-stats-bot/issues"
+"CI/CD" = "https://github.com/atbuy/wordle-stats-bot/actions"
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
