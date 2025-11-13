@@ -1,9 +1,13 @@
 import asyncio
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from discord.ext import commands
 from loguru import logger
+from openpyxl import Workbook
+from openpyxl.styles import Alignment, Border, PatternFill, Side
+from openpyxl.utils import get_column_letter
 
 from wordle.settings import get_settings
 
@@ -25,8 +29,9 @@ class EventsCog(commands.Cog):
     They can be used to handle errors, guild changes and more.
     """
 
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot, month: str):
         self.bot = bot
+        self.month = datetime.strptime(month, "%Y-%m")
 
     @commands.Cog.listener()
     async def on_ready(self) -> None:
@@ -62,25 +67,48 @@ class EventsCog(commands.Cog):
             logger.error("Channel not found.")
             return {}
 
-        now = datetime.now(timezone.utc)
-        one_month_ago = now - timedelta(days=30)
-
         user_data = {}
 
         points_pattern = r".*([0-6X])/[0-6]:"
         users_pattern = r"<@(\d+)>"
 
+        # Get start and end datetimes for the messages
+        start = datetime(
+            self.month.year,
+            self.month.month,
+            1,
+            tzinfo=ZoneInfo(settings.timezone),
+        )
+
+        if self.month.month == 12:
+            end = datetime(
+                self.month.year + 1,
+                1,
+                1,
+                tzinfo=ZoneInfo(settings.timezone),
+            )
+        else:
+            end = datetime(
+                self.month.year,
+                self.month.month + 1,
+                1,
+                tzinfo=ZoneInfo(settings.timezone),
+            )
+
         channel_messages = channel.history(
             limit=None,
-            after=one_month_ago,
+            after=start,
+            before=end,
             oldest_first=True,
         )
+
+        usernames: dict[str, str] = {}
 
         async for message in channel_messages:
             if message.author.id != settings.app_id:
                 continue
 
-            message_date = message.created_at
+            message_date = message.created_at.astimezone(ZoneInfo(settings.timezone))
             date = ""
             if message_date is not None:
                 date = message_date.strftime("%d %a")
@@ -89,7 +117,7 @@ class EventsCog(commands.Cog):
                 user_data[date] = {}
 
             content = message.content.strip()
-            if "Here are yesterday's results:" not in content:
+            if "results:" not in content:
                 continue
 
             lines = content.split("\n")
@@ -100,14 +128,21 @@ class EventsCog(commands.Cog):
                 if points == []:
                     continue
 
+                usernames |= {
+                    str(mention.id): mention.display_name
+                    for mention in message.mentions
+                }
+
                 score = POINT_MAP[points[0]]
 
                 users = re.findall(users_pattern, line)
                 for user in users:
-                    if user not in user_data[date]:
-                        user_data[date][user] = 0
+                    username = usernames[user]
 
-                    user_data[date][user] += score
+                    if username not in user_data[date]:
+                        user_data[date][username] = 0
+
+                    user_data[date][username] += score
 
         logger.info(user_data)
 
@@ -115,3 +150,116 @@ class EventsCog(commands.Cog):
 
     async def generate_report(self, user_data: dict[str, dict[str, int]]) -> None:
         """Create excel sheet with user data."""
+
+        wb = Workbook()
+        ws = wb.active
+        if ws is None:
+            logger.error("Could not get active sheet")
+            return
+
+        ws.title = "Wordle Statistics"
+
+        header_fill = PatternFill("solid", fgColor="8A8A8A")
+        data_fill = PatternFill("solid", fgColor="BABABA")
+        no_border = Border(
+            left=Side(style="none"),
+            right=Side(style="none"),
+            top=Side(style="none"),
+            bottom=Side(style="none"),
+        )
+
+        usernames: set[str] = set()
+        for day_data in user_data.values():
+            usernames.update(day_data.keys())
+
+        users = sorted(usernames)
+        days = list(user_data.keys())
+
+        # Format column for usernames
+        ws["A1"] = "Players"
+        ws["A1"].fill = header_fill
+        ws["A1"].border = no_border
+
+        totals: dict[str, int] = {}
+
+        for row_index, username in enumerate(users, start=2):
+            username_cell = ws[f"A{row_index}"]
+            username_cell.value = username
+            username_cell.border = no_border
+            username_cell.fill = header_fill
+
+            row_total = 0
+            for col_index, day in enumerate(days, start=2):
+                day_score = user_data.get(day, {}).get(username, 0)
+                header = ws.cell(row=1, column=col_index)
+                header.value = day
+                header.fill = header_fill
+                header.border = no_border
+
+                cell = ws.cell(row=row_index, column=col_index)
+                cell.value = day_score
+                cell.fill = data_fill
+                cell.border = no_border
+                row_total += day_score
+
+            totals[username] = row_total
+
+        last_main_row = len(users) + 1
+        buffer_row = last_main_row + 1
+        totals_header_row = buffer_row + 1
+
+        # Merge the A+B columns and write the "TOTAL SCORE" header
+        ws.merge_cells(
+            start_row=totals_header_row,
+            start_column=1,
+            end_row=totals_header_row,
+            end_column=2,
+        )
+        total_title_cell = ws.cell(row=totals_header_row, column=1)
+        total_title_cell.value = "TOTAL SCORE"
+        total_title_cell.fill = PatternFill("solid", fgColor="75BB75")
+        total_title_cell.border = no_border
+        total_title_cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Write sub-headers A: "Players" and B: "Total Points"
+        totals_subheaders_row = totals_header_row + 1
+
+        players_header = ws.cell(row=totals_subheaders_row, column=1)
+        players_header.value = "Players"
+        players_header.fill = header_fill
+        players_header.border = no_border
+
+        points_header = ws.cell(row=totals_subheaders_row, column=2)
+        points_header.value = "Total Points"
+        points_header.fill = header_fill
+        points_header.border = no_border
+
+        # Write data to the totals table
+        totals_data_start_row = totals_subheaders_row + 1
+
+        for offset, username in enumerate(users):
+            row = totals_data_start_row + offset
+
+            name_cell = ws.cell(row=row, column=1)
+            name_cell.value = username
+            name_cell.fill = header_fill
+            name_cell.border = no_border
+
+            total_cell = ws.cell(row=row, column=2)
+            total_cell.value = totals.get(username, 0)
+            total_cell.fill = data_fill
+            total_cell.border = no_border
+
+        # Auto-fit column widths for usernames
+        for column_cells in ws.columns:
+            max_length = 0
+            column_letter = get_column_letter(column_cells[0].column)
+            for cell in column_cells:
+                if cell.value is not None:
+                    max_length = max(max_length, len(str(cell.value)))
+
+            ws.column_dimensions[column_letter].width = max_length + 2
+
+        filename = "wordle_stats.xlsx"
+        wb.save(filename)
+        logger.info(f"Saved excel report to '{filename}'")

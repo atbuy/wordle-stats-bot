@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     guild_id: int
     channel_id: int
     app_id: int
+    timezone: str
     command_prefix: str = "&"
     log_level: int = logging.INFO
 
