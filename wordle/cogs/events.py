@@ -1,6 +1,6 @@
 import asyncio
 import re
-from datetime import datetime, timezone
+from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from discord.ext import commands
@@ -163,6 +163,7 @@ class EventsCog(commands.Cog):
         data_fill = PatternFill("solid", fgColor="BABABA")
         extra_headers_fill = PatternFill("solid", fgColor="75BB75")
         align_center = Alignment(horizontal="center", vertical="center")
+        align_right = Alignment(horizontal="right", vertical="center")
         no_border = Border(
             left=Side(style="none"),
             right=Side(style="none"),
@@ -202,6 +203,7 @@ class EventsCog(commands.Cog):
                 header.value = day
                 header.fill = header_fill
                 header.border = no_border
+                header.alignment = align_right
 
                 cell = ws.cell(row=row_index, column=col_index)
                 cell.value = day_score
