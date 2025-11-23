@@ -6,6 +6,13 @@ from loguru import logger
 
 from wordle.bot import WordleStatsBot
 from wordle.cogs.events import EventsCog
+from pathlib import Path
+from dotenv import load_dotenv
+
+# Load environment variables
+cwd = Path(".").absolute()
+env_path = cwd.joinpath(".env")
+load_dotenv(env_path)
 
 bot = WordleStatsBot()
 
