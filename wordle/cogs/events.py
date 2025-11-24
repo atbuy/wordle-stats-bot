@@ -3,6 +3,7 @@ import re
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
+from discord import File
 from discord.ext import commands
 from loguru import logger
 from openpyxl import Workbook
@@ -50,6 +51,12 @@ class EventsCog(commands.Cog):
             return
 
         await self.generate_report(user_data)
+
+        await self._channel.send(
+            "This month's Wordle stats up to now!",
+            file=File("wordle_stats.xlsx"),
+        )
+
         await self.bot.close()
 
     async def get_user_data(self) -> dict[str, dict[str, int]]:
@@ -62,8 +69,8 @@ class EventsCog(commands.Cog):
             logger.error("Guild not found. Is the bot in the server?")
             return {}
 
-        channel = guild.get_channel(settings.channel_id)
-        if channel is None:
+        self._channel = guild.get_channel(settings.channel_id)
+        if self._channel is None:
             logger.error("Channel not found.")
             return {}
 
@@ -94,7 +101,7 @@ class EventsCog(commands.Cog):
                 tzinfo=ZoneInfo(settings.timezone),
             )
 
-        channel_messages = channel.history(
+        channel_messages = self._channel.history(
             limit=None,
             after=start,
             before=end,
