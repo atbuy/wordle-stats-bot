@@ -70,7 +70,6 @@ class EventsCog(commands.Cog):
         user_data = {}
 
         points_pattern = r".*([0-6X])/[0-6]:"
-        users_pattern = r"<@(\d+)>"
 
         # Get start and end datetimes for the messages
         start = datetime(
@@ -102,7 +101,9 @@ class EventsCog(commands.Cog):
             oldest_first=True,
         )
 
-        usernames: dict[str, str] = {}
+        all_usernames: dict[str, str] = {
+            str(member.id): member.display_name for member in guild.members
+        }
 
         async for message in channel_messages:
             if message.author.id != settings.app_id:
@@ -120,29 +121,22 @@ class EventsCog(commands.Cog):
             if "results:" not in content:
                 continue
 
+            # Split the content into lines and iterate over it
             lines = content.split("\n")
-            for line in lines:
-                line = line.strip()
 
+            for line in lines:
                 points = re.findall(points_pattern, line)
                 if points == []:
                     continue
 
-                usernames |= {
-                    str(mention.id): mention.display_name
-                    for mention in message.mentions
-                }
-
                 score = POINT_MAP[points[0]]
 
-                users = re.findall(users_pattern, line)
-                for user in users:
-                    username = usernames[user]
+                for user_id, display_name in all_usernames.items():
+                    if user_id in line or display_name in line:
+                        if display_name not in user_data[date]:
+                            user_data[date][display_name] = 0
 
-                    if username not in user_data[date]:
-                        user_data[date][username] = 0
-
-                    user_data[date][username] += score
+                        user_data[date][display_name] += score
 
         logger.info(user_data)
 

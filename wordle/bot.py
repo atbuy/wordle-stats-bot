@@ -15,8 +15,7 @@ class WordleStatsBot(commands.Bot):
             name=f"{self._prefix}help",
         )
 
-        self._intents = discord.Intents.default()
-        self._intents.message_content = True
+        self._intents = discord.Intents.all()
 
         super().__init__(
             *args,
