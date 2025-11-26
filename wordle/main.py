@@ -10,8 +10,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # Load environment variables
-cwd = Path(".").absolute()
-env_path = cwd.joinpath(".env")
+root = Path(__file__).parent.parent
+env_path = root.joinpath(".env")
 load_dotenv(env_path)
 
 bot = WordleStatsBot()
