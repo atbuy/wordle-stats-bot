@@ -1,5 +1,6 @@
 import asyncio
 import re
+import subprocess
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
@@ -9,6 +10,7 @@ from loguru import logger
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, PatternFill, Side
 from openpyxl.utils import get_column_letter
+from openpyxl.worksheet.page import PageMargins
 
 from wordle.settings import get_settings
 
@@ -34,6 +36,9 @@ class EventsCog(commands.Cog):
         self.bot = bot
         self.month = datetime.strptime(month, "%Y-%m")
 
+        self.workbook_filename = "wordle_stats.xlsx"
+        self.workbook_image = "wordle_stats.png"
+
     @commands.Cog.listener()
     async def on_ready(self) -> None:
         logger.info("Bot is ready.")
@@ -51,10 +56,12 @@ class EventsCog(commands.Cog):
             return
 
         await self.generate_report(user_data)
+        await self.genarate_image()
 
+        attachments = [File(self.workbook_image), File(self.workbook_filename)]
         await self._channel.send(
-            "This month's Wordle stats up to now!",
-            file=File("wordle_stats.xlsx"),
+            "Wordle statistics up to now :)",
+            files=attachments,
         )
 
         await self.bot.close()
@@ -157,6 +164,12 @@ class EventsCog(commands.Cog):
         if ws is None:
             logger.error("Could not get active sheet")
             return
+
+        # Configure sheet style to be rendered by libreoffice
+        ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
+        ws.page_setup.fitToWidth = 1
+        ws.page_setup.fitToHeight = 0
+        ws.page_margins = PageMargins(left=0.25, right=0.25, top=0.25, bottom=0.25)
 
         ws.title = "Wordle Statistics"
 
@@ -336,6 +349,18 @@ class EventsCog(commands.Cog):
 
             ws.column_dimensions[column_letter].width = max_length + 2
 
-        filename = "wordle_stats.xlsx"
-        wb.save(filename)
-        logger.info(f"Saved excel report to '{filename}'")
+        wb.save(self.workbook_filename)
+        logger.info(f"Saved excel report to '{self.workbook_filename}'")
+
+    async def genarate_image(self) -> None:
+        """Convert the excel sheet to a PDF and then to a PNG."""
+
+        # Use libreoffice to generate a PDF from the workbook
+        libreoffice_command = [
+            "libreoffice",
+            "--headless",
+            "--convert-to",
+            "png",
+            self.workbook_filename,
+        ]
+        subprocess.run(libreoffice_command, check=True)
