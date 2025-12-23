@@ -115,6 +115,11 @@ class EventsCog(commands.Cog):
             oldest_first=True,
         )
 
+        all_usernames = {
+            str(member.id): member.display_name for member in guild.members
+        }
+        logger.debug(f"Got message mentions: {all_usernames}")
+
         async for message in channel_messages:
             if message.author.id != settings.app_id:
                 continue
@@ -126,10 +131,6 @@ class EventsCog(commands.Cog):
 
             if date not in user_data:
                 user_data[date] = {}
-
-            message_mentions = {
-                str(member.id): member.display_name for member in message.mentions
-            }
 
             content = message.content.strip()
             if "results:" not in content:
@@ -143,10 +144,12 @@ class EventsCog(commands.Cog):
                 if points == []:
                     continue
 
+                logger.debug(f"Got line: {line}")
+
                 score = POINT_MAP[points[0]]
 
-                for user_id, display_name in message_mentions.items():
-                    if user_id in line or display_name in line:
+                for user_id, display_name in all_usernames.items():
+                    if user_id in line or f"@{display_name}" in line:
                         if display_name not in user_data[date]:
                             user_data[date][display_name] = 0
 
