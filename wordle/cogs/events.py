@@ -60,7 +60,7 @@ class EventsCog(commands.Cog):
 
         attachments = [File(self.workbook_image), File(self.workbook_filename)]
         await self._channel.send(
-            "Wordle statistics up to now :)",
+            "Wordle statistics for this month :)",
             files=attachments,
         )
 
