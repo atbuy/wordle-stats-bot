@@ -115,10 +115,6 @@ class EventsCog(commands.Cog):
             oldest_first=True,
         )
 
-        all_usernames: dict[str, str] = {
-            str(member.id): member.display_name for member in guild.members
-        }
-
         async for message in channel_messages:
             if message.author.id != settings.app_id:
                 continue
@@ -130,6 +126,10 @@ class EventsCog(commands.Cog):
 
             if date not in user_data:
                 user_data[date] = {}
+
+            message_mentions = {
+                str(member.id): member.display_name for member in message.mentions
+            }
 
             content = message.content.strip()
             if "results:" not in content:
@@ -145,7 +145,7 @@ class EventsCog(commands.Cog):
 
                 score = POINT_MAP[points[0]]
 
-                for user_id, display_name in all_usernames.items():
+                for user_id, display_name in message_mentions.items():
                     if user_id in line or display_name in line:
                         if display_name not in user_data[date]:
                             user_data[date][display_name] = 0
@@ -169,6 +169,8 @@ class EventsCog(commands.Cog):
         ws.page_setup.orientation = ws.ORIENTATION_LANDSCAPE
         ws.page_setup.fitToWidth = 1
         ws.page_setup.fitToHeight = 0
+        ws.sheet_properties.pageSetUpPr.fitToPage = True
+        ws.print_area = "A1:AF34"
         ws.page_margins = PageMargins(left=0.25, right=0.25, top=0.25, bottom=0.25)
 
         ws.title = "Wordle Statistics"
@@ -348,6 +350,8 @@ class EventsCog(commands.Cog):
                     max_length = max(max_length, len(str(cell.value)))
 
             ws.column_dimensions[column_letter].width = max_length + 2
+
+        ws.print_area = f"A1:{get_column_letter(ws.max_column)}{ws.max_row}"
 
         wb.save(self.workbook_filename)
         logger.info(f"Saved excel report to '{self.workbook_filename}'")
